@@ -578,10 +578,10 @@
       }
     }
     return data;
-  }, setDomStorage = function (obj, storageName, data) {
+  }/*, setDomStorage = function (obj, storageName, data) {
     var storage = getDomStorageGroup(obj, TRUE);
     storage[storageName] = data;
-  }, removeDomStorage = function (obj, storageName) {
+  }*/, removeDomStorage = function (obj, storageName) {
     removeProperty(getDomStorageGroup(obj), storageName)
   }, getDomStorageDataByKey = function (obj, storageName, key) {
     var nullKey = key == NULL, data = getDomStorage(obj, storageName, nullKey);
@@ -866,74 +866,7 @@
   var getParents = function (elements, parents, selector, until, interval, depth) {
     return getPaths(elements, parents, 'parentNode', selector, until, interval, depth);
   };
-  var matchTypeNamespace = function (tn) {
-    var matches = [];
-    var i = tn.indexOf('.');
-    if (i > -1) {
-      matches[2] = tn.slice(i);
-      tn = tn.slice(0, i)
-    }
-    i = tn.indexOf('!');
-    if (i > -1) {
-      matches[1] = '!';
-      matches[0] = tn.slice(0, i)
-    } else {
-      matches[0] = tn;
-    }
-    return matches[0] && matches;
-  };
-  var fNamespace = function (namespace) {
-    var dot = '.';
-    if (isString(namespace) && namespace.charAt(namespace.length - 1) !== dot) {
-      namespace += dot
-    }
-    return namespace
-  };
-  var fSelector = function (selector) {
-    return (isString(selector) && selector.trim()) || UNDEFINED
-  };
-  var fTypeNamespace = function (method, dom, event, data, handler) {
-    var eType, namespace;
-    var eventIsString = nonEmptyString(event);
-    var warnMsg = '无效的事件类型';
-    if (!event || (!eventIsString && !nonEmptyString(event.type))) {
-      $console.warn(warnMsg);
-      return
-    }
-    var target;
-    if (eventIsString) {
-      event = event.trim();
-      if (event.indexOf(' ') > -1) {
-        var events = event.split(' ');
-        var l = events.length;
-        if (l > 1) {
-          for (var i = 0; i < l; i++) {
-            dom[method](events[i], data, handler)
-          }
-          return
-        }
-        event = events[0];
-      }
-      var typeName = matchTypeNamespace(event);
-      if (!typeName) {
-        $console.warn(warnMsg);
-        return;
-      }
-      event = eType = typeName[0];
-      namespace = typeName[1] || typeName[2];
-    } else {
-      eType = event.type;
-      namespace = event.namespace;
-      target = event.target;
-    }
-    return {
-      e: event,
-      t: eType,
-      a: target,
-      n: fNamespace(namespace),
-      s: eventIsString
-    }
-  };
+
   var createCustomEvent = function () {
     try {
       new CustomEvent("test", {
@@ -3026,7 +2959,7 @@
   });
 
 
-  ////do
+  ////domReady
   var isDomReady;
 
   function domReady(callback) {
@@ -3038,13 +2971,13 @@
         isDomReady = TRUE;
         if (d) {
           callback();
-          doc.removeEventListener(d, c);
-          win.removeEventListener(l, c);
+          removeEventListener(doc, d, c);
+          removeEventListener(win, l, c);
         }
         c = d = l = callback = UNDEFINED;
       };
-      doc.addEventListener(d, c);
-      win.removeEventListener(l, c);
+      addEventListener(doc, d, c);
+      addEventListener(win, l, c);
     }
   }
 
