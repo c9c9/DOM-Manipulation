@@ -380,7 +380,7 @@
   //var arrayProto = Array.prototype;
 
   var removeProperty = $.removeProperty = function (object, property) {
-    let ret;
+    var ret;
     if (!isObject(object)) {
       ret = NULL
     } else if (isArray(property)) {
