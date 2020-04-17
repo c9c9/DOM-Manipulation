@@ -1,8 +1,4 @@
-(function (global, factory) {
-  typeof exports === 'object' && typeof module !== 'undefined' ? module.exports = global.dom = factory() :
-    typeof define === 'function' && define.amd ? define(factory) :
-      (global.dom = global.$ = factory());
-}(this, (function () {
+(function () {
   'use strict';
   var win = window, doc = win.document;
   var ArrayT = Array,
@@ -387,19 +383,22 @@
     let ret;
     if (!isObject(object)) {
       ret = NULL
-    } else if (arguments.length < 2 || property === TRUE) {
-      ret = TRUE;
-      eachIn(object, function (key, value) {
-        ret = ret && removeProperty(object, key) !== FALSE
-      });
     } else if (isArray(property)) {
       eachI(property, function (i, key) {
         ret = ret && removeProperty(object, key) !== FALSE
       })
+    } else if (arguments.length < 2 || isObject(property) || (property === TRUE && (property = object))) {
+      ret = TRUE;
+      eachIn(property, function (key) {
+        ret = ret && removeProperty(object, key) !== FALSE
+      });
     } else if (property in object) {
       ret = FALSE;
       try {
         object[property] = UNDEFINED;
+      } catch (e) {
+      }
+      try {
         ret = delete object[property];
       } catch (e) {
         // e['@'] = "removeProperty";
@@ -2099,7 +2098,7 @@
         _sel = childSelector;
         _fn = listener
       }
-      var targetHandler = parseEvent(event), type = targetHandler.e, ns = targetHandler.ns, nonSelector = !childSelector,
+      var targetHandler = parseEvent(event), type = targetHandler.e, ns = targetHandler.ns, nonSelector = !_sel,
         isFn = isFunction(_fn), isRemoveEvent = type && nonSelector && isFn;
       if (!type && !ns && nonSelector && !isFn) {
         return _this
@@ -2566,6 +2565,9 @@
   function tryDelete(obj, name) {
     try {
       obj[name] = UNDEFINED;
+    } catch (e) {
+    }
+    try {
       return delete obj[name];
     } catch (e) {
     }
@@ -2985,5 +2987,13 @@
   /* $(win).on('error', function (e) {
      $console.error('DOMErrorListener:\t',e.error)
    });*/
-  return $
-})));
+
+  win.dom = win.$ = $;
+  if (typeof exports === 'object' && typeof module !== 'undefined') {
+    module.exports = $;
+  } else if (typeof define === 'function' && define.amd) {
+    define(function () {
+      return $;
+    })
+  }
+}());
