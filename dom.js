@@ -1715,7 +1715,7 @@
       var element;
       if (noneArg) {
         element = this.gets(isElement, 1)[0];
-        return element ? element.innerHTML : undefined;
+        return element ? element.innerHTML : UNDEFINED;
       }
 
       if (html !== UNDEFINED) {
@@ -2460,7 +2460,7 @@
     }
 
     if (!isFunction(fn)) {
-      return undefined;
+      return UNDEFINED;
     }
 
     args = arraySlice.call(arguments, 2);
@@ -2523,17 +2523,17 @@
     }
   }
 
-  function parseArguments(url, data, success, dataType, type, length) {
+  function parseArguments(url, data, success, dataType, type) {
     if (isObject(url)) {
       return url;
     }
-    if (isFunction(data)) {
+    if (!isObject(data) && (isString(success) || (success === UNDEFINED && dataType === UNDEFINED)) && type === UNDEFINED) {
       type = dataType;
       dataType = success;
       success = data;
       data = UNDEFINED;
     }
-    if (!isFunction(success) && length < 5) {
+    if (isString(success) && type === UNDEFINED) {
       type = dataType;
       dataType = success;
       success = UNDEFINED;
@@ -2587,7 +2587,7 @@
 
   function ajaxJSONP(options) {
     var jsonp = options.jsonp || 'callback', jsonpCallback = options.jsonpCallback || 'jsonpCallback_' + Date.now(),
-      success = options.success, error = options.onerror, complete = options.complete;
+      success = options.success, error = options.error, complete = options.complete;
     success = isFunction(success) ? success : UNDEFINED;
     error = isFunction(error) ? error : UNDEFINED;
     complete = isFunction(complete) ? complete : UNDEFINED;
@@ -2707,9 +2707,86 @@
     return img;
   }
 
+
+  /**
+   *
+   * @param r
+   */
+  function async2resolve(r) {
+    var _resolve_ = this._resolve_;
+    if (_resolve_) {
+      _resolve_(r);
+      async2destructor(this);
+    } else {
+      this.returns = {
+        res: r
+      }
+    }
+  }
+
+  /**
+   *
+   * @param r
+   */
+  function async2reject(r) {
+    var _reject_ = this._reject_;
+    if (_reject_) {
+      _reject_(r);
+      async2destructor(this);
+    } else {
+      this.returns = {
+        rej: r
+      }
+    }
+  }
+
+  function async2destructor(async2) {
+    return removeProperty(async2)
+  }
+
+  /**
+   *
+   * @returns {{resolve: async2resolve, reject: async2reject,promise:Promise}}
+   */
+  var createAsync2 = $.createAsync2 = function () {
+    /**
+     *
+     * @type {{resolve: async2resolve, reject: async2reject,promise?:Promise,_resolve_?,_reject_?,returns?}}
+     */
+    var async2 = {resolve: async2resolve, reject: async2reject};
+    async2.promise = new Promise(function (resolve, reject) {
+      var returns = async2.returns;
+      if (returns) {
+        if (returns.res) {
+          resolve(returns.res);
+        } else {
+          reject(returns.rej);
+        }
+        async2destructor(async2);
+      } else {
+        async2._resolve_ = resolve;
+        async2._reject_ = reject;
+      }
+    });
+    return async2;
+  };
+  $.addAlias = function (obj, alias) {
+    isObject(obj) && eachIn(alias, function (alias, name) {
+      if (name in obj) {
+        alias = isArray(alias) ? alias : [alias];
+        for (var i = 0, l = alias, al; i < l; i++) {
+          al = alias[i];
+          if (al != NULL) {
+            obj[al] = obj[name]
+          }
+        }
+      }
+    })
+  };
+
   function ajax(options, aData, aSuccess, aDataType, aType) {
-    options = parseArguments(options, aData, aSuccess, aDataType, aType, arguments.length);
-    var error = options.onerror,
+    options = parseArguments(options, aData, aSuccess, aDataType, aType);
+    var error = options.error,
       complete = options.complete;
     error = isFunction(error) ? error : UNDEFINED;
     complete = isFunction(complete) ? complete : UNDEFINED;
@@ -2928,7 +3005,7 @@
   }
 
   function ajaxGet(url, data, success, dataType) {
-    return ajax(url, data, success, dataType, 'GET')
+    return $.ajax(url, data, success, dataType, 'GET')
   }
 
 
@@ -2938,7 +3015,7 @@
   assign($, {
     get: ajaxGet,
     post: function (url, data, success, dataType) {
-      return ajax(url, data, success, dataType, 'POST')
+      return $.ajax(url, data, success, dataType, 'POST')
     },
     getJSONP: function (url, data, success) {
       return ajaxGet(url, data, success, 'jsonp')
@@ -2952,15 +3029,149 @@
     loadImage: loadImage,
     tryDelete: tryDelete,
     runScript: runScript,
-    ajax: ajax,
+    ajax: function (options, aData, aSuccess, aDataType, aType) {
+      options = parseArguments(options, aData, aSuccess, aDataType, aType);
+      if (win.Promise
+        && (options.promise ||
+          !isFunction(options.error)
+          && !isFunction(options.complete)
+          && (options.success === 1 || options.success === TRUE))) {
+        $[PromiseExtendName]();
+        var xhr;
+        return new Promise(function (resolve, reject) {
+          xhr = ajax(assign({}, options, {success: resolve, error: reject}))
+        }).setReturns('xhr', xhr);
+      } else {
+        return ajax(options);
+      }
+    },
     replaceAjax: function (newAjax) {
       if (isFunction(newAjax)) {
         ajax = newAjax;
       }
     }
   });
+  var PromiseExtendName = 'PromiseExtend',
+    /**
+     *
+     * @type {function(...[*]=)}
+     */
+    PromiseExtend = $[PromiseExtendName] = function () {
+      if (!win.Promise) {
+        return
+      }
+      var PromiseProto = Promise.prototype;
+      $[PromiseExtendName] = noop;
+      if (PromiseProto.thenR) {
+        return
+      }
+      if (!PromiseProto.finally) {
+        PromiseProto.finally = function _finally(callback) {
+          var promise = this;
+          var constructor = promise.constructor;
 
+          if (isFunction(callback)) {
+            return promise.then(function (value) {
+              return constructor.resolve(callback()).then(function () {
+                return value;
+              });
+            }, function (reason) {
+              return constructor.resolve(callback()).then(function () {
+                throw reason;
+              });
+            });
+          }
+          return promise.then(callback, callback);
+        };
+      }
 
+      var returnsH = function (p, newP, returnsName, returns) {
+        if (!isString(returnsName)) {
+          returns = returnsName;
+          returnsName = NULL;
+        }
+        var rn = '_returns_name_';
+        returnsName = returnsName || p[rn] || 'returns';
+        if (returns !== UNDEFINED) {
+          newP[returnsName] = returns;
+          newP[rn] = returnsName;
+        } else if (returnsName in p) {
+          newP[returnsName] = p[returnsName];
+          newP[rn] = returnsName;
+        }
+        return newP;
+      };
+      var promiseProto = Promise.prototype;
+      /**
+       *
+       * @param onFulfilled
+       * @param [returnsName]
+       * @param [returns]
+       * @return {Promise}
+       */
+      promiseProto.thenR = function (onFulfilled, returnsName, returns) {
+        return returnsH(this, this.then(onFulfilled), returnsName, returns);
+      };
+
+      /**
+       *
+       * @param onRejected
+       * @param [returnsName]
+       * @param [returns]
+       * @return {Promise}
+       */
+      promiseProto.catchR = function (onRejected, returnsName, returns) {
+        return returnsH(this, this.catch(onRejected), returnsName, returns);
+      };
+      /**
+       *
+       * @param onFinally
+       * @param [returnsName]
+       * @param [returns]
+       * @return {Promise}
+       */
+      promiseProto.finallyR = function (onFinally, returnsName, returns) {
+        return returnsH(this, this.finally(onFinally), returnsName, returns);
+      };
+      /**
+       *
+       * @param name
+       * @param [returns]
+       * @return {Promise}
+       */
+      promiseProto.setReturns = function (name, returns) {
+        return returnsH(this, this, name, returns)
+      };
+      var doCall = function (o, prop, args) {
+        var length = args.length;
+        if (isFunction(prop)) {
+          length < 1 ? prop(o) : length > 1 ? prop.apply(NULL, args.unshift(o) && args) : prop(o, args[0])
+        } else if (isFunction(o[prop])) {
+          length < 1 ? o[prop]() : length > 1 ? o[prop].apply(o, args) : o[prop](args[0]);
+        }
+      };
+      promiseProto.callValue = promiseProto.call = function (fn, args) {
+        var promise = this, state = promise.promiseState;
+        args = arraySlice.call(arguments, 1);
+        if (state == NULL) {
+          promise.then(function (value) {
+            promise.promiseValue = value;
+            promise.promiseState = TRUE;
+            doCall(value, fn, args);
+            promise = args = NULL;
+          }).catch(function (value) {
+            promise.promiseValue = value;
+            promise.promiseState = FALSE;
+            promise = args = NULL;
+            doCall(value, fn, args);
+          })
+        } else {
+          doCall(promise.promiseValue, fn, args);
+          promise = args = NULL;
+        }
+      };
+    };
+  PromiseExtend();
   ////domReady
   var isDomReady;
 
