@@ -3146,7 +3146,7 @@
         var length = args.length;
         if (isFunction(prop)) {
           length < 1 ? prop(o) : length > 1 ? prop.apply(NULL, args.unshift(o) && args) : prop(o, args[0])
-        } else if (isFunction(o[prop])) {
+        } else if (o && isFunction(o[prop])) {
           length < 1 ? o[prop]() : length > 1 ? o[prop].apply(o, args) : o[prop](args[0]);
         }
       };
