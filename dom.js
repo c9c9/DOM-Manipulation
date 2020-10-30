@@ -9,6 +9,9 @@
     indexOfCall = function (arr, value) {
       return arrayIndexOf.call(arr, value)
     },
+    trunc = Math.trunc || (Math.trunc = function (v) {
+      return !isFinite(v = +v) ? v : (v - v % 1) || (v < 0 ? -0 : v === 0 ? v : 0);
+    }),
     Obj = Object,
     defineProperty = Obj.defineProperty,
     hasOwnProperty = Obj.prototype.hasOwnProperty,
@@ -65,6 +68,27 @@
   $.all = function (selector, context) {
     return domFromNodeList((context || doc).querySelectorAll(selector))
   };
+  $.isArray = isArray;
+  $.trunc = trunc;
+  $.isNull = function (obj) {
+      return obj === NULL
+    };
+  var isNil= $.isNil= function (obj) {
+      return obj == NULL
+    },
+    nonNil = $.nonNil = function (obj) {
+      return obj != NULL
+    };
+  $.nonNull = function (obj) {
+    return obj !== NULL;
+  };
+  $.isDefined = function (obj) {
+    return obj !== UNDEFINED
+  };
+
+  $.isUndefined = function (obj) {
+    return obj === UNDEFINED
+  };
   var $console = $.console = console, noop = $.noop = function () {
     }, domFromNode = $.byNode = $.by = function (node) {
       var dom = createDomM();
@@ -94,10 +118,14 @@
       return !!obj && isObjectT(obj)
     }, isPlainObject = $.isPlainObject = function (obj) {
       return isObject(obj) && !isWindow(obj) && Obj.getPrototypeOf(obj) === Obj.prototype
-    }, isEmptyObject = $.isEmptyObject = function (obj, checkHasOwn) {
-      if (isObject(obj)) {
-        for (var name in obj) {
-          if (!checkHasOwn || hasOwnProperty.call(obj, name)) {
+    }, isEmptyAny = $.isEmptyAny = function (obj, checkHasOwn) {
+      if (nonNil(obj)) {
+        let hasLength = isString(obj) || isArray(obj), length = "length";
+        if (hasLength && obj[length] > 0) {
+          return FALSE
+        }
+        for (let name in obj) {
+          if ((!hasLength || name !== length) && (!checkHasOwn || hasOwnProperty.call(obj, name))) {
             return FALSE;
           }
         }
@@ -114,8 +142,10 @@
       return typeof obj === "number"
     }, isNumber = $.isNumber = function (obj) {
       return isNumberT(obj) && isFinite(obj)
+    }, toInt = $.toInt = function (obj) {
+      return isFinite(obj = trunc(obj)) ? obj : 0
     }, isInt = $.isInt = function (obj) {
-      return obj | 0 === obj
+      return toInt(obj) === obj
     }, toNumeral = $.toNumeral = function (obj) {
       return (isNumber(obj) ? obj : isString(obj) ? parseFloat(obj) : +obj) || 0;
     }, isBoolean = $.isBoolean = function (obj) {
@@ -191,6 +221,16 @@
     }, isEleWinDoc = $.isEleWinDoc = function (obj) {
       return isElement(obj) || isWindow(obj) || isDocument(obj)
     };
+
+  $.nonEmptyObject = function (obj, checkHasOwn) {
+    return isObject(obj) && !isEmptyAny(obj, checkHasOwn);
+  };
+  var isEmptyObject = $.isEmptyObject = function (obj, checkHasOwn) {
+    return isObject(obj) && isEmptyAny(obj, checkHasOwn);
+  }
+  $.isEmpty = function (obj, checkHasOwn) {
+    return !obj || isEmptyAny(obj, checkHasOwn);
+  };
   $.iifObject = function (obj) {
     return isObjectT(obj) ? obj : NULL
   };
@@ -208,9 +248,6 @@
   };
   $.iifNumber = function (obj) {
     return isNumber(obj) || 0
-  };
-  $.isEmpty = function (obj) {
-    return !obj || isObject(obj) && isEmptyObject(obj, TRUE);
   };
   $.each = function (obj, callback, fromIndexOrNotCheck, arg3) {
     return isArrayLike(obj) ? eachI(obj, callback, fromIndexOrNotCheck, arg3) : eachIn(obj, callback, fromIndexOrNotCheck, arg3)
@@ -318,11 +355,11 @@
     }
     return a.join('')
   };
-
+  $.objectHasOwn = hasOwnProperty;
   var hasOwnProxy = function (obj, key) {
       return obj.hasOwnProperty(key)
     }, getHasOwnFn = $.getHasOwnFn = function (obj) {
-      return obj == NULL ? returnFalse : isFunction(obj.hasOwnProperty) ? hasOwnProxy : hasOwnCall;
+      return isNil(obj) ? returnFalse : isFunction(obj.hasOwnProperty) ? hasOwnProxy : hasOwnCall;
     },
     hasOwnCall = $.hasOwnCall = function (obj, key) {
       return hasOwnProperty.call(obj, key);
@@ -572,7 +609,7 @@
     var data;
     if (storage) {
       data = storage[storageName];
-      if (data == NULL && initData) {
+      if (isNil(data) && initData) {
         data = storage[storageName] = {}
       }
     }
@@ -583,7 +620,7 @@
   }*/, removeDomStorage = function (obj, storageName) {
     removeProperty(getDomStorageGroup(obj), storageName)
   }, getDomStorageDataByKey = function (obj, storageName, key) {
-    var nullKey = key == NULL, data = getDomStorage(obj, storageName, nullKey);
+    var nullKey = isNil(key), data = getDomStorage(obj, storageName, nullKey);
     if (nullKey) {
       return data
     }
@@ -727,7 +764,7 @@
   if (testElement.dataset) {
     getDataSet = function (element, key) {
       var dataset = element.dataset;
-      return key == NULL ? dataset : dataset[key];
+      return isNil(key) ? dataset : dataset[key];
     };
     setDataSet = function (element, key, value) {
       element.dataset[key] = value;
@@ -736,7 +773,7 @@
     getDataSet = function (element, key) {
       var dataSet = {};
       var start = 'data-';
-      if (key != NULL) {
+      if (nonNil(key)) {
         dataSet[key] = getAttr(element, start + toDataAttrName(key));
         return dataSet[key];
       }
@@ -754,7 +791,7 @@
     };
   }
   var getDataSetJSON = function (element, key) {
-    return (key == NULL ? tryParseJSON : dataSetParse)(getDataSet(element, key))
+    return (isNil(key) ? tryParseJSON : dataSetParse)(getDataSet(element, key))
   };
   var setDataSetJSON = function (element, key, value) {
     setDataSet(element, key, tryStringifyJSON(value))
@@ -2858,7 +2895,7 @@
     progress = isFunction(progress) ? progress : UNDEFINED;
     loadend = isFunction(loadend) ? loadend : UNDEFINED;
 
-    var ret, sid, timeout = options.timeout, RET = ret = {
+    var ret, sid, timeout = options.timeout | 0, RET = ret = {
       abort: function () {
         if (on) {
           on({type: 'abort', isLocaleAbort: TRUE})
@@ -2936,7 +2973,7 @@
       if (request.onprogress !== UNDEFINED) {
         request.onprogress = progress
       } else {
-        progressTimeout = Math.min(Math.max((timeout | 0) / 100, 100), 100);
+        progressTimeout = Math.min(Math.max(timeout / 100, 100), 100);
         localeProgress = function () {
           if (localeProgress && progress && request && ++progressCount < 99) {
             localeProgressId = setTimeout(localeProgress, progressTimeout);
@@ -3007,7 +3044,6 @@
   function ajaxGet(url, data, success, dataType) {
     return $.ajax(url, data, success, dataType, 'GET')
   }
-
 
   /**
    * @alias window.dom
@@ -3153,7 +3189,7 @@
       promiseProto.callValue = promiseProto.call = function (fn, args) {
         var promise = this, state = promise.promiseState;
         args = arraySlice.call(arguments, 1);
-        if (state == NULL) {
+        if (isNil(state)) {
           promise.then(function (value) {
             promise.promiseValue = value;
             promise.promiseState = TRUE;
